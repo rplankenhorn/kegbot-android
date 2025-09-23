@@ -91,6 +91,7 @@ public class HardwareManager extends Manager {
     mManagers.add(mKegboardManager);
     mManagers.add(new FakeControllerManager(getBus(), mListener));
     mManagers.add(new NetworkControllerManager(getBus(), mListener, config));
+    mManagers.add(new MQTTControllerManager(getBus(), mListener, config));
   }
 
   @Override

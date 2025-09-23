@@ -58,6 +58,8 @@ public class MQTTController implements Controller, MqttCallback {
     private final String mBrokerUrl;
     private final String mClientId;
     private final String mTopicPrefix;
+    private final String mUsername;
+    private final String mPassword;
     private final ControllerManager.Listener mListener;
 
     private String mStatus = Controller.STATUS_UNKNOWN;
@@ -72,10 +74,12 @@ public class MQTTController implements Controller, MqttCallback {
     private final Map<String, ThermoSensor> mThermoSensors = Maps.newLinkedHashMap();
 
     public MQTTController(String brokerUrl, String clientId, String topicPrefix, 
-                         ControllerManager.Listener listener) {
+                         String username, String password, ControllerManager.Listener listener) {
         mBrokerUrl = brokerUrl;
         mClientId = clientId;
         mTopicPrefix = topicPrefix != null ? topicPrefix : "";
+        mUsername = username;
+        mPassword = password;
         mListener = listener;
         mConnected = false;
     }
@@ -134,6 +138,14 @@ public class MQTTController implements Controller, MqttCallback {
             options.setConnectionTimeout(30);
             options.setKeepAliveInterval(60);
             options.setAutomaticReconnect(true);
+            
+            // Set username and password if provided
+            if (mUsername != null && !mUsername.isEmpty()) {
+                options.setUserName(mUsername);
+                if (mPassword != null && !mPassword.isEmpty()) {
+                    options.setPassword(mPassword.toCharArray());
+                }
+            }
 
             mMqttClient.connect(options);
             
