@@ -28,8 +28,6 @@ import com.squareup.otto.Subscribe;
 import org.kegbot.app.config.AppConfiguration;
 import org.kegbot.app.util.IndentingPrintWriter;
 
-import java.util.UUID;
-
 public class MQTTControllerManager implements ControllerManager {
   private static final String TAG = MQTTControllerManager.class.getSimpleName();
 
@@ -57,8 +55,8 @@ public class MQTTControllerManager implements ControllerManager {
       // Build the broker URL
       String brokerUrl = "tcp://" + mqttServer + ":" + mConfig.getMqttPort();
       
-      // Generate a unique client ID
-      String clientId = "kegbot-android-" + UUID.randomUUID().toString().substring(0, 8);
+      // Generate a consistent client ID based on server and port (instead of random UUID)
+      String clientId = "kegbot-android-" + mqttServer.replace(".", "-") + "-" + mConfig.getMqttPort();
       
       // Get configuration values
       String topicPrefix = mConfig.getMqttTopicPrefix();
