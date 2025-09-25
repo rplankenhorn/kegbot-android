@@ -56,7 +56,7 @@ public class MQTTControllerManager implements ControllerManager {
       String brokerUrl = "tcp://" + mqttServer + ":" + mConfig.getMqttPort();
       
       // Generate a consistent client ID based on server and port (instead of random UUID)
-      String clientId = "kegbot-android-" + mqttServer.replace(".", "-") + "-" + mConfig.getMqttPort();
+      String clientId = "kegbot-android-" + Math.abs((mqttServer + ":" + mConfig.getMqttPort()).hashCode());
       
       // Get configuration values
       String topicPrefix = mConfig.getMqttTopicPrefix();
