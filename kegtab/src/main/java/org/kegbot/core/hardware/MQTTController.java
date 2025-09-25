@@ -67,7 +67,7 @@ public class MQTTController implements Controller, MqttCallback {
 
     private MqttClient mMqttClient;
     private ExecutorService mExecutor;
-    private boolean mConnected;
+    private volatile boolean mConnected;
 
     private AtomicBoolean mStopped = new AtomicBoolean(true);
     private final Map<String, FlowMeter> mFlowMeters = Maps.newLinkedHashMap();
@@ -94,6 +94,7 @@ public class MQTTController implements Controller, MqttCallback {
 
     void stop() {
         Preconditions.checkState(mStopped.compareAndSet(false, true));
+        Log.d(TAG, "MQTT Controller stopping");
         disconnect();
         if (mExecutor != null && !mExecutor.isShutdown()) {
             mExecutor.shutdown();
@@ -122,8 +123,9 @@ public class MQTTController implements Controller, MqttCallback {
         Log.d(TAG, "MQTT Worker exiting ...");
     }
 
-    private void connect() throws MqttException {
+    private synchronized void connect() throws MqttException {
         if (mConnected) {
+            Log.d(TAG, "Already connected to MQTT broker");
             return;
         }
 
@@ -137,7 +139,7 @@ public class MQTTController implements Controller, MqttCallback {
             options.setCleanSession(true);
             options.setConnectionTimeout(30);
             options.setKeepAliveInterval(60);
-            options.setAutomaticReconnect(true);
+            options.setAutomaticReconnect(false); // Handle reconnection manually
             
             // Set username and password if provided
             if (mUsername != null && !mUsername.isEmpty()) {
@@ -148,14 +150,20 @@ public class MQTTController implements Controller, MqttCallback {
             }
 
             mMqttClient.connect(options);
+            Log.d(TAG, "MQTT client connected successfully");
             
             // Subscribe to topics
             subscribeToTopics();
             
-            mConnected = true;
             // Set device as connected immediately since we don't have an info topic
             mSerialNumber = mClientId; // Use client ID as serial number
             mStatus = Controller.STATUS_OK;
+            mConnected = true;
+            Log.d(TAG, "Setting mConnected = true");
+            
+            // Always notify about attachment - let HardwareManager handle duplicate prevention
+            Log.d(TAG, "MQTT Controller connected, notifying attachment with name: " + getName());
+            Log.d(TAG, "Controller instance: " + this);
             mListener.onControllerAttached(this);
             Log.d(TAG, "Successfully connected to MQTT broker");
             
@@ -179,11 +187,13 @@ public class MQTTController implements Controller, MqttCallback {
         }
     }
 
-    private void disconnect() {
+    private synchronized void disconnect() {
+        Log.d(TAG, "Disconnect called, mConnected = " + mConnected);
         if (!mConnected) {
             return;
         }
         mConnected = false;
+        Log.d(TAG, "Setting mConnected = false");
 
         if (mMqttClient != null) {
             try {
@@ -206,8 +216,10 @@ public class MQTTController implements Controller, MqttCallback {
     @Override
     public void connectionLost(Throwable cause) {
         Log.w(TAG, "MQTT connection lost: " + (cause != null ? cause.getMessage() : "Unknown"));
+        Log.d(TAG, "Setting mConnected = false due to connection lost");
         mConnected = false;
         mStatus = Controller.STATUS_UNRESPONSIVE;
+        // Don't call disconnect() here to avoid race conditions - let the worker thread handle reconnection
     }
 
     @Override
