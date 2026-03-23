@@ -23,7 +23,6 @@ import android.util.Log;
 
 import com.google.common.base.Strings;
 import com.squareup.otto.Bus;
-import com.squareup.otto.Subscribe;
 
 import org.kegbot.app.config.AppConfiguration;
 import org.kegbot.app.util.IndentingPrintWriter;
@@ -101,15 +100,6 @@ public class MQTTControllerManager implements ControllerManager {
       writer.printPair("mqttSerialNumber", mController.getSerialNumber());
       writer.printPair("mqttFlowMeters", mController.getFlowMeters().size());
       writer.printPair("mqttThermoSensors", mController.getThermoSensors().size());
-    }
-  }
-
-  @Subscribe
-  public void onFakeControllerEvent(final FakeControllerEvent event) {
-    if (event.isAdded()) {
-      mListener.onControllerAttached(event.getController());
-    } else {
-      mListener.onControllerRemoved(event.getController());
     }
   }
 

@@ -71,7 +71,7 @@
             android:defaultValue=""
             android:inputType="text"
             android:key="config:MQTT_SERVER"
-            android:summary="IP or hostname of the MQTT server"
+            android:summary="IP or hostname of the MQTT server. Restart app to apply."
             android:title="MQTT Server">
         </EditTextPreference>
         <EditTextPreference

@@ -20,11 +20,9 @@
 package org.kegbot.core.hardware;
 
 import android.os.SystemClock;
-import androidx.annotation.Nullable;
 import android.util.Log;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
@@ -37,8 +35,8 @@ import org.kegbot.core.FlowMeter;
 import org.kegbot.core.ThermoSensor;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -70,8 +68,8 @@ public class MQTTController implements Controller, MqttCallback {
     private volatile boolean mConnected;
 
     private AtomicBoolean mStopped = new AtomicBoolean(true);
-    private final Map<String, FlowMeter> mFlowMeters = Maps.newLinkedHashMap();
-    private final Map<String, ThermoSensor> mThermoSensors = Maps.newLinkedHashMap();
+    private final Map<String, FlowMeter> mFlowMeters = new ConcurrentHashMap<>();
+    private final Map<String, ThermoSensor> mThermoSensors = new ConcurrentHashMap<>();
 
     public MQTTController(String brokerUrl, String clientId, String topicPrefix, 
                          String username, String password, ControllerManager.Listener listener) {
@@ -216,10 +214,10 @@ public class MQTTController implements Controller, MqttCallback {
     @Override
     public void connectionLost(Throwable cause) {
         Log.w(TAG, "MQTT connection lost: " + (cause != null ? cause.getMessage() : "Unknown"));
-        Log.d(TAG, "Setting mConnected = false due to connection lost");
         mConnected = false;
         mStatus = Controller.STATUS_UNRESPONSIVE;
-        // Don't call disconnect() here to avoid race conditions - let the worker thread handle reconnection
+        mListener.onControllerRemoved(this);
+        // Worker thread will detect mConnected == false and attempt to reconnect.
     }
 
     @Override
@@ -230,10 +228,18 @@ public class MQTTController implements Controller, MqttCallback {
         // Parse the message based on topic structure (e.g., kegbot/meter/0, kegbot/temp/1)
         if (topic.contains("/" + TOPIC_METER + "/")) {
             String meterIndex = extractTopicIndex(topic, TOPIC_METER);
-            handleMeterMessage(meterIndex, payload);
+            if (meterIndex != null) {
+                handleMeterMessage(meterIndex, payload);
+            } else {
+                Log.w(TAG, "Could not extract meter index from topic: " + topic);
+            }
         } else if (topic.contains("/" + TOPIC_TEMP + "/")) {
             String tempIndex = extractTopicIndex(topic, TOPIC_TEMP);
-            handleTempMessage(tempIndex, payload);
+            if (tempIndex != null) {
+                handleTempMessage(tempIndex, payload);
+            } else {
+                Log.w(TAG, "Could not extract temp index from topic: " + topic);
+            }
         }
     }
 
@@ -242,10 +248,10 @@ public class MQTTController implements Controller, MqttCallback {
         String[] parts = topic.split("/");
         for (int i = 0; i < parts.length - 1; i++) {
             if (parts[i].equals(topicType)) {
-                return parts[i + 1]; // Return the index after the topic type
+                return parts[i + 1];
             }
         }
-        return "0"; // Default to 0 if index not found
+        return null;
     }
 
     @Override
